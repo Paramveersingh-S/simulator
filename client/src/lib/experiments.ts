@@ -11,14 +11,21 @@ export interface Output {
 }
 
 export interface Wire {
-  from: { x: number; y: number };
-  to: { x: number; y: number };
+  points: { x: number; y: number }[];
   active: boolean;
   delay?: number;
 }
 
 export interface CircuitState {
   [key: string]: any;
+}
+
+export interface LayoutMetrics {
+  inputPositions: { x: number; y: number }[];
+  outputPositions: { x: number; y: number }[];
+  chipLeft: number;
+  chipRight: number;
+  chipCenter: number;
 }
 
 export interface Experiment {
@@ -30,7 +37,29 @@ export interface Experiment {
   hasClock?: boolean;
   initialState?: () => CircuitState;
   logic: (inputs: Record<string, boolean>, state: CircuitState, clockEdge?: boolean) => { outputs: Record<string, boolean>; newState: CircuitState };
-  getWires: (inputs: Record<string, boolean>, outputs: Record<string, boolean>) => Wire[];
+  getWires: (inputs: Record<string, boolean>, outputs: Record<string, boolean>, layout: LayoutMetrics) => Wire[];
+}
+
+// Helper to create orthogonal wire paths
+function createOrthogonalWire(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  active: boolean,
+  delay: number = 0
+): Wire {
+  const midX = (fromX + toX) / 2;
+  return {
+    points: [
+      { x: fromX, y: fromY },
+      { x: midX, y: fromY },
+      { x: midX, y: toY },
+      { x: toX, y: toY },
+    ],
+    active,
+    delay,
+  };
 }
 
 export const experiments: Experiment[] = [
@@ -49,12 +78,17 @@ export const experiments: Experiment[] = [
       outputs: { Y: (inputs.A && inputs.B) || inputs.C },
       newState: state,
     }),
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 80 }, to: { x: 200, y: 100 }, active: inputs.A, delay: 0 },
-      { from: { x: 100, y: 140 }, to: { x: 200, y: 120 }, active: inputs.B, delay: 0 },
-      { from: { x: 100, y: 200 }, to: { x: 200, y: 160 }, active: inputs.C, delay: 0 },
-      { from: { x: 350, y: 130 }, to: { x: 450, y: 130 }, active: outputs.Y, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["A", "B", "C"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos) => {
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs.Y, 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "full-adder",
@@ -77,13 +111,18 @@ export const experiments: Experiment[] = [
       },
       newState: state,
     }),
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 80 }, to: { x: 200, y: 100 }, active: inputs.A, delay: 0 },
-      { from: { x: 100, y: 140 }, to: { x: 200, y: 120 }, active: inputs.B, delay: 0 },
-      { from: { x: 100, y: 200 }, to: { x: 200, y: 140 }, active: inputs.Cin, delay: 0 },
-      { from: { x: 350, y: 110 }, to: { x: 450, y: 110 }, active: outputs.Sum, delay: 0.3 },
-      { from: { x: 350, y: 150 }, to: { x: 450, y: 150 }, active: outputs.Cout, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["A", "B", "Cin"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos, idx) => {
+        const outputKey = ["Sum", "Cout"][idx];
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs[outputKey], 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "multiplexer",
@@ -100,12 +139,17 @@ export const experiments: Experiment[] = [
       outputs: { Y: inputs.Select ? inputs.In1 : inputs.In0 },
       newState: state,
     }),
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 80 }, to: { x: 200, y: 100 }, active: inputs.Select, delay: 0 },
-      { from: { x: 100, y: 140 }, to: { x: 200, y: 120 }, active: inputs.In0, delay: 0 },
-      { from: { x: 100, y: 200 }, to: { x: 200, y: 140 }, active: inputs.In1, delay: 0 },
-      { from: { x: 350, y: 130 }, to: { x: 450, y: 130 }, active: outputs.Y, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["Select", "In0", "In1"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos) => {
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs.Y, 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "priority-encoder",
@@ -131,14 +175,18 @@ export const experiments: Experiment[] = [
       else outputs = { Y1: false, Y0: false };
       return { outputs, newState: state };
     },
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 70 }, to: { x: 200, y: 90 }, active: inputs.I0, delay: 0 },
-      { from: { x: 100, y: 120 }, to: { x: 200, y: 110 }, active: inputs.I1, delay: 0 },
-      { from: { x: 100, y: 170 }, to: { x: 200, y: 130 }, active: inputs.I2, delay: 0 },
-      { from: { x: 100, y: 220 }, to: { x: 200, y: 150 }, active: inputs.I3, delay: 0 },
-      { from: { x: 350, y: 110 }, to: { x: 450, y: 110 }, active: outputs.Y1, delay: 0.3 },
-      { from: { x: 350, y: 140 }, to: { x: 450, y: 140 }, active: outputs.Y0, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["I0", "I1", "I2", "I3"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos, idx) => {
+        const outputKey = ["Y1", "Y0"][idx];
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs[outputKey], 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "sr-latch",
@@ -176,15 +224,18 @@ export const experiments: Experiment[] = [
         newState: { Q1: newQ1, Q2: newQ2, Q3: newQ3 },
       };
     },
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 70 }, to: { x: 200, y: 90 }, active: inputs.Set1, delay: 0 },
-      { from: { x: 100, y: 120 }, to: { x: 200, y: 110 }, active: inputs.Set2, delay: 0 },
-      { from: { x: 100, y: 170 }, to: { x: 200, y: 130 }, active: inputs.Set3, delay: 0 },
-      { from: { x: 100, y: 220 }, to: { x: 200, y: 150 }, active: inputs.Reset, delay: 0 },
-      { from: { x: 350, y: 100 }, to: { x: 450, y: 100 }, active: outputs.Q1, delay: 0.3 },
-      { from: { x: 350, y: 130 }, to: { x: 450, y: 130 }, active: outputs.Q2, delay: 0.3 },
-      { from: { x: 350, y: 160 }, to: { x: 450, y: 160 }, active: outputs.Q3, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["Set1", "Set2", "Set3", "Reset"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos, idx) => {
+        const outputKey = ["Q1", "Q2", "Q3"][idx];
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs[outputKey], 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "counter",
@@ -223,14 +274,18 @@ export const experiments: Experiment[] = [
         newState: { count: newCount },
       };
     },
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 100 }, to: { x: 200, y: 110 }, active: inputs.CountUp, delay: 0 },
-      { from: { x: 100, y: 160 }, to: { x: 200, y: 140 }, active: inputs.CountDown, delay: 0 },
-      { from: { x: 350, y: 90 }, to: { x: 450, y: 90 }, active: outputs.Q3, delay: 0.3 },
-      { from: { x: 350, y: 120 }, to: { x: 450, y: 120 }, active: outputs.Q2, delay: 0.3 },
-      { from: { x: 350, y: 150 }, to: { x: 450, y: 150 }, active: outputs.Q1, delay: 0.3 },
-      { from: { x: 350, y: 180 }, to: { x: 450, y: 180 }, active: outputs.Q0, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["CountUp", "CountDown"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos, idx) => {
+        const outputKey = ["Q3", "Q2", "Q1", "Q0"][idx];
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs[outputKey], 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "shift-register",
@@ -270,17 +325,18 @@ export const experiments: Experiment[] = [
         newState: { register: newRegister },
       };
     },
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 130 }, to: { x: 200, y: 130 }, active: inputs.Data, delay: 0 },
-      { from: { x: 350, y: 80 }, to: { x: 450, y: 80 }, active: outputs.Q0, delay: 0.3 },
-      { from: { x: 350, y: 100 }, to: { x: 450, y: 100 }, active: outputs.Q1, delay: 0.3 },
-      { from: { x: 350, y: 120 }, to: { x: 450, y: 120 }, active: outputs.Q2, delay: 0.3 },
-      { from: { x: 350, y: 140 }, to: { x: 450, y: 140 }, active: outputs.Q3, delay: 0.3 },
-      { from: { x: 350, y: 160 }, to: { x: 450, y: 160 }, active: outputs.Q4, delay: 0.3 },
-      { from: { x: 350, y: 180 }, to: { x: 450, y: 180 }, active: outputs.Q5, delay: 0.3 },
-      { from: { x: 350, y: 200 }, to: { x: 450, y: 200 }, active: outputs.Q6, delay: 0.3 },
-      { from: { x: 350, y: 220 }, to: { x: 450, y: 220 }, active: outputs.Q7, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["Data"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos, idx) => {
+        const outputKey = ["Q0", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"][idx];
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs[outputKey], 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "sequence-detector",
@@ -315,11 +371,17 @@ export const experiments: Experiment[] = [
         newState: { history },
       };
     },
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 100 }, to: { x: 200, y: 110 }, active: inputs.Bit, delay: 0 },
-      { from: { x: 100, y: 160 }, to: { x: 200, y: 140 }, active: inputs.Reset, delay: 0 },
-      { from: { x: 350, y: 130 }, to: { x: 450, y: 130 }, active: outputs.Detected, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["Bit", "Reset"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos) => {
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs.Detected, 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "fsm-accumulator",
@@ -354,13 +416,18 @@ export const experiments: Experiment[] = [
         newState: { accumulator: acc },
       };
     },
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 80 }, to: { x: 200, y: 100 }, active: inputs.Add1, delay: 0 },
-      { from: { x: 100, y: 140 }, to: { x: 200, y: 120 }, active: inputs.Add2, delay: 0 },
-      { from: { x: 100, y: 200 }, to: { x: 200, y: 140 }, active: inputs.Reset, delay: 0 },
-      { from: { x: 350, y: 110 }, to: { x: 450, y: 110 }, active: outputs.Overflow, delay: 0.3 },
-      { from: { x: 350, y: 140 }, to: { x: 450, y: 140 }, active: outputs.Carry, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["Add1", "Add2", "Reset"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos, idx) => {
+        const outputKey = ["Overflow", "Carry"][idx];
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs[outputKey], 0.3));
+      });
+      return wires;
+    },
   },
   {
     id: "traffic-light",
@@ -419,14 +486,17 @@ export const experiments: Experiment[] = [
         newState: { state: currentState, subCycle },
       };
     },
-    getWires: (inputs, outputs) => [
-      { from: { x: 100, y: 130 }, to: { x: 200, y: 130 }, active: inputs.Override, delay: 0 },
-      { from: { x: 350, y: 70 }, to: { x: 450, y: 70 }, active: outputs.R1, delay: 0.3 },
-      { from: { x: 350, y: 100 }, to: { x: 450, y: 100 }, active: outputs.Y1, delay: 0.3 },
-      { from: { x: 350, y: 130 }, to: { x: 450, y: 130 }, active: outputs.G1, delay: 0.3 },
-      { from: { x: 350, y: 160 }, to: { x: 450, y: 160 }, active: outputs.R2, delay: 0.3 },
-      { from: { x: 350, y: 190 }, to: { x: 450, y: 190 }, active: outputs.Y2, delay: 0.3 },
-      { from: { x: 350, y: 220 }, to: { x: 450, y: 220 }, active: outputs.G2, delay: 0.3 },
-    ],
+    getWires: (inputs, outputs, layout) => {
+      const wires: Wire[] = [];
+      layout.inputPositions.forEach((pos, idx) => {
+        const inputKey = ["Override"][idx];
+        wires.push(createOrthogonalWire(pos.x, pos.y, layout.chipLeft, pos.y, inputs[inputKey], 0));
+      });
+      layout.outputPositions.forEach((pos, idx) => {
+        const outputKey = ["R1", "Y1", "G1", "R2", "Y2", "G2"][idx];
+        wires.push(createOrthogonalWire(layout.chipRight, pos.y, pos.x, pos.y, outputs[outputKey], 0.3));
+      });
+      return wires;
+    },
   },
 ];
