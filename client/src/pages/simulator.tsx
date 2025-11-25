@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { experiments, type Experiment, type CircuitState, type LayoutMetrics } from "@/lib/experiments";
 import type { PinPosition } from "@/lib/ic-pins";
 import { ICChip } from "@/components/ui/ic-chip";
@@ -6,6 +6,8 @@ import { Cpu, Zap, Menu, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { MQTTConfigDialog } from "@/components/ui/mqtt-config";
+import { useMQTT } from "@/hooks/use-mqtt";
 
 export default function Simulator() {
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment>(experiments[0]);
@@ -102,9 +104,13 @@ export default function Simulator() {
     });
   }, [selectedExperiment.inputs.length, selectedExperiment.outputs.length]);
 
-  useLayoutEffect(() => {
-    updateLayout();
-  }, [updateLayout, selectedExperiment, inputValues, outputValues]);
+  useEffect(() => {
+    // Defer layout calculation to avoid blocking UI
+    const timeoutId = setTimeout(() => {
+      updateLayout();
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, [updateLayout, selectedExperiment]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -140,14 +146,54 @@ export default function Simulator() {
     }
   }, []);
 
+  // MQTT Integration
+  const mqtt = useMQTT(selectedExperiment.id);
+
+  // Subscribe to input changes from hardware
+  useEffect(() => {
+    if (!mqtt.isConnected) return;
+
+    const unsubscribers = selectedExperiment.inputs.map(input => {
+      return mqtt.subscribeToInput(input.id, (value, source) => {
+        if (source === 'hardware') {
+          setInputValues(prev => ({
+            ...prev,
+            [input.id]: value,
+          }));
+        }
+      });
+    });
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [selectedExperiment.id, selectedExperiment.inputs, mqtt.isConnected]);
+
+  // Publish output changes to MQTT
+  useEffect(() => {
+    if (!mqtt.isConnected) return;
+
+    Object.entries(outputValues).forEach(([outputId, value]) => {
+      mqtt.publishOutput(outputId, value);
+    });
+  }, [outputValues, mqtt.isConnected]);
+
   const toggleInput = (id: string) => {
+    const newValue = !inputValues[id];
     setInputValues((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [id]: newValue,
     }));
+
+    // Publish to MQTT when manually toggled
+    if (mqtt.isConnected) {
+      mqtt.publishInput(id, newValue);
+    }
   };
 
-  const wires = layoutMetrics ? selectedExperiment.getWires(inputValues, outputValues, layoutMetrics) : [];
+  const wires = useMemo(() => {
+    return layoutMetrics ? selectedExperiment.getWires(inputValues, outputValues, layoutMetrics) : [];
+  }, [layoutMetrics, selectedExperiment, inputValues, outputValues]);
 
   const getBinaryString = (outputs: Record<string, boolean>) => {
     return Object.entries(outputs)
@@ -170,15 +216,22 @@ export default function Simulator() {
           <Cpu className="w-6 h-6 text-emerald-400" />
           <h1 className="text-xl font-bold text-slate-100">Circuit Simulator</h1>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          data-testid="button-theme-toggle"
-          aria-label="Toggle theme"
-        >
-          {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-        </Button>
+        <div className="flex gap-2">
+          <MQTTConfigDialog
+            isConnected={mqtt.isConnected}
+            onConnect={mqtt.connect}
+            onDisconnect={mqtt.disconnect}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            data-testid="button-theme-toggle"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </Button>
+        </div>
       </div>
       <div className="space-y-1">
         {experiments.map((exp) => (
@@ -214,6 +267,11 @@ export default function Simulator() {
           <h1 className="text-lg font-bold text-slate-100">Circuit Simulator</h1>
         </div>
         <div className="flex gap-2">
+          <MQTTConfigDialog
+            isConnected={mqtt.isConnected}
+            onConnect={mqtt.connect}
+            onDisconnect={mqtt.disconnect}
+          />
           <Button
             variant="ghost"
             size="icon"
