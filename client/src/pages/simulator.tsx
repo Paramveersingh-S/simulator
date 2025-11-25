@@ -1,5 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { experiments, type Experiment, type CircuitState, type LayoutMetrics } from "@/lib/experiments";
+import type { PinPosition } from "@/lib/ic-pins";
+import { ICChip } from "@/components/ui/ic-chip";
 import { Cpu, Zap, Menu, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,7 +16,7 @@ export default function Simulator() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [layoutMetrics, setLayoutMetrics] = useState<LayoutMetrics | null>(null);
-  
+
   const circuitStateRef = useRef<CircuitState>({});
   const previousClockRef = useRef(0);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -22,6 +24,7 @@ export default function Simulator() {
   const outputRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const chipRef = useRef<HTMLDivElement>(null);
   const updateLayoutTimeoutRef = useRef<number | null>(null);
+  const pinPositionsRef = useRef<Map<number, PinPosition>>(new Map());
 
   useEffect(() => {
     const initialInputs: Record<string, boolean> = {};
@@ -40,7 +43,7 @@ export default function Simulator() {
   useEffect(() => {
     const clockEdge = selectedExperiment.hasClock && clockTick > previousClockRef.current;
     previousClockRef.current = clockTick;
-    
+
     const result = selectedExperiment.logic(inputValues, circuitStateRef.current, clockEdge);
     setOutputValues(result.outputs);
     circuitStateRef.current = result.newState;
@@ -94,6 +97,7 @@ export default function Simulator() {
         chipLeft: chipRect.left - boardRect.left,
         chipRight: chipRect.right - boardRect.left,
         chipCenter: chipRect.left + chipRect.width / 2 - boardRect.left,
+        pinPositions: pinPositionsRef.current,
       });
     });
   }, [selectedExperiment.inputs.length, selectedExperiment.outputs.length]);
@@ -111,7 +115,7 @@ export default function Simulator() {
     };
 
     window.addEventListener("resize", handleResize);
-    
+
     return () => {
       window.removeEventListener("resize", handleResize);
       if (updateLayoutTimeoutRef.current !== null) {
@@ -185,11 +189,10 @@ export default function Simulator() {
               setMobileMenuOpen(false);
             }}
             data-testid={`button-experiment-${exp.id}`}
-            className={`w-full text-left px-4 py-3 rounded-md transition-all ${
-              selectedExperiment.id === exp.id
-                ? "bg-emerald-500/20 border-l-4 border-emerald-400 text-slate-100"
-                : "bg-slate-800/50 text-slate-300 hover-elevate"
-            }`}
+            className={`w-full text-left px-4 py-3 rounded-md transition-all ${selectedExperiment.id === exp.id
+              ? "bg-emerald-500/20 border-l-4 border-emerald-400 text-slate-100"
+              : "bg-slate-800/50 text-slate-300 hover-elevate"
+              }`}
           >
             <div className="font-semibold text-sm">{exp.name}</div>
             <div className="text-xs text-slate-400 mt-1">{exp.description}</div>
@@ -257,9 +260,8 @@ export default function Simulator() {
                 <Button
                   onClick={() => setClockRunning(!clockRunning)}
                   data-testid="button-clock-toggle"
-                  className={`${
-                    clockRunning ? "bg-amber-500 hover:bg-amber-600" : "bg-slate-700 hover:bg-slate-600"
-                  } text-white`}
+                  className={`${clockRunning ? "bg-amber-500 hover:bg-amber-600" : "bg-slate-700 hover:bg-slate-600"
+                    } text-white`}
                 >
                   <Zap className={`w-4 h-4 mr-2 ${clockRunning ? "clock-pulse" : ""}`} />
                   Clock: {clockRunning ? "Running" : "Stopped"}
@@ -302,7 +304,7 @@ export default function Simulator() {
               </svg>
 
               {/* Grid Layout: 3 columns - inputs, chip, outputs */}
-              <div 
+              <div
                 className="grid gap-8 items-center"
                 style={{
                   gridTemplateColumns: "auto 1fr auto",
@@ -328,17 +330,15 @@ export default function Simulator() {
                         <button
                           onClick={() => toggleInput(input.id)}
                           data-testid={`switch-${input.id}`}
-                          className={`w-8 h-12 md:w-10 md:h-16 rounded transition-all ${
-                            inputValues[input.id] ? "switch-on" : "switch-off"
-                          }`}
+                          className={`w-8 h-12 md:w-10 md:h-16 rounded transition-all ${inputValues[input.id] ? "switch-on" : "switch-off"
+                            }`}
                           aria-label={`Toggle ${input.label}`}
                         >
                           <div
-                            className={`w-6 h-6 md:w-8 md:h-8 rounded-full mx-auto transition-transform ${
-                              inputValues[input.id]
-                                ? "bg-white transform translate-y-1"
-                                : "bg-slate-700 transform -translate-y-1"
-                            }`}
+                            className={`w-6 h-6 md:w-8 md:h-8 rounded-full mx-auto transition-transform ${inputValues[input.id]
+                              ? "bg-white transform translate-y-1"
+                              : "bg-slate-700 transform -translate-y-1"
+                              }`}
                           />
                         </button>
                         <div className="text-xs text-slate-500 mt-1 font-mono">
@@ -357,35 +357,14 @@ export default function Simulator() {
                     gridRow: `1 / ${maxRows + 1}`,
                   }}
                 >
-                  <div ref={chipRef} className="relative ic-chip w-32 md:w-48 h-32 md:h-40 rounded-md flex items-center justify-center">
-                    {/* Pin indicators on left */}
-                    <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-around -ml-2">
-                      {selectedExperiment.inputs.slice(0, 8).map((input, idx) => (
-                        <div key={input.id} className="flex items-center gap-1">
-                          <div className="w-2 h-1 bg-slate-600 rounded-sm"></div>
-                          <div className="text-[8px] text-slate-500">{idx + 1}</div>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Pin indicators on right */}
-                    <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-around -mr-2">
-                      {selectedExperiment.outputs.slice(0, 8).map((output, idx) => (
-                        <div key={output.id} className="flex items-center gap-1">
-                          <div className="text-[8px] text-slate-500">{idx + 9}</div>
-                          <div className="w-2 h-1 bg-slate-600 rounded-sm"></div>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Chip label */}
-                    <div className="text-center">
-                      <Cpu className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 text-emerald-400" />
-                      <div className="text-xs md:text-sm font-semibold text-slate-300 uppercase tracking-wider">
-                        Logic IC
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-1">
-                        74HC{selectedExperiment.id.slice(0, 3).toUpperCase()}
-                      </div>
-                    </div>
+                  <div ref={chipRef}>
+                    <ICChip
+                      partNumber={selectedExperiment.icChip}
+                      onPinPositionsCalculated={(positions) => {
+                        pinPositionsRef.current = positions;
+                        updateLayout();
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -407,9 +386,8 @@ export default function Simulator() {
                         <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">{output.label}</div>
                         <div
                           data-testid={`led-${output.id}`}
-                          className={`w-8 h-8 md:w-10 md:h-10 rounded-full transition-all ${
-                            outputValues[output.id] ? "led-glow-on bg-emerald-400" : "led-glow-off bg-slate-700"
-                          }`}
+                          className={`w-8 h-8 md:w-10 md:h-10 rounded-full transition-all ${outputValues[output.id] ? "led-glow-on bg-emerald-400" : "led-glow-off bg-slate-700"
+                            }`}
                           aria-label={`LED ${output.label}`}
                         >
                           {outputValues[output.id] && (
