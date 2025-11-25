@@ -184,8 +184,11 @@ export default function Simulator() {
         {experiments.map((exp) => (
           <button
             key={exp.id}
-            onClick={() => {
-              setSelectedExperiment(exp);
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedExperiment.id !== exp.id) {
+                setSelectedExperiment(exp);
+              }
               setMobileMenuOpen(false);
             }}
             data-testid={`button-experiment-${exp.id}`}
