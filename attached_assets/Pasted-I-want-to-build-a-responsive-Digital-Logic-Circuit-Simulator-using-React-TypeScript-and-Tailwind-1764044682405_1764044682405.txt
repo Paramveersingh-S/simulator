@@ -1,0 +1,38 @@
+I want to build a responsive "Digital Logic Circuit Simulator" using React, TypeScript, and Tailwind CSS. 
+
+### **Core Concept**
+A web-based educational tool where students select a digital experiment (e.g., "Full Adder", "Shift Register") and interact with a realistic visual representation of the circuit. 
+- They toggle "DIP Switches" (Inputs).
+- They see the signal travel through "Wires" (SVG lines).
+- They watch "LEDs" light up (Outputs).
+- A central "IC Chip" performs the logic.
+
+### **Design & Responsiveness (CRITICAL)**
+1.  **Mobile-First Approach:** - On mobile: The layout must stack vertically. The sidebar (experiment list) goes to the top or becomes a dropdown. The circuit board scales down or becomes horizontally scrollable.
+    - On Desktop: A split-screen layout (Sidebar on left, Simulator on right).
+2.  **Visual Style (Skeuomorphic):**
+    - Dark mode aesthetics (Slate-900 background).
+    - The components (Switches, LEDs, Chips) should look 3D with CSS shadows.
+    - Wires should be drawn using SVG lines that connect specific coordinates on the board. 
+    - Wires must "glow" (change color/brightness) when their carrying signal is HIGH.
+
+### **The 10 Experiments (Simplified Academic Names)**
+Do not use real-world names like "Smart Home" or "Parking Lot". Use standard Digital Electronics names:
+1.  **Basic Logic Gates:** Implementation of AND/OR logic. Inputs: A, B, C. Output: Y.
+2.  **Full Adder:** Binary addition circuit. Inputs: A, B, Cin. Outputs: Sum, Cout.
+3.  **2:1 Multiplexer:** Data routing. Inputs: Select, In0, In1. Output: Y.
+4.  **4-to-2 Priority Encoder:** Inputs: I0, I1, I2, I3. Outputs: Y1, Y0.
+5.  **SR Latch (Lockout Circuit):** Sequential logic. Inputs: Set1, Set2, Set3, Reset. Outputs: Q1, Q2, Q3.
+6.  **4-Bit Synchronous Counter:** Counts 0-15. Inputs: CountUp, CountDown. Outputs: Q3, Q2, Q1, Q0.
+7.  **8-Bit Shift Register (SIPO):** Serial-In Parallel-Out. Inputs: Clock, Data. Outputs: Q0-Q7.
+8.  **Sequence Detector (101):** Detects pattern "1-0-1". Inputs: Clock, Bit, Reset. Output: Detected.
+9.  **Finite State Machine (Accumulator):** Adds values until overflow. Inputs: Add1, Add2, Reset. Outputs: Overflow, Carry.
+10. **Traffic Light Controller (Timer):** Cyclic state machine. Inputs: Clock, Override. Outputs: 6 LEDs (R/Y/G for 2 directions).
+
+### **Technical Requirements**
+1.  **State Management:** Use `useState` and `useEffect`. 
+2.  **Clock Signal:** For sequential experiments (Counter, Shift Register), implement a `setInterval` that runs automatically. Visually toggle the "Clock" switch on the UI so the student sees the pulse.
+3.  **Single File Structure:** If possible, keep the logic and UI in `App.tsx` or separate logically into `experiments.ts` for configuration.
+4.  **No Backend:** All logic must run client-side in the browser.
+
+Please generate the full code for this.
