@@ -85,7 +85,7 @@ export default {
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
-        mono: ["var(--font-mono)"],
+        mono: ["JetBrains Mono", "Fira Code", "var(--font-mono)"],
       },
       keyframes: {
         "accordion-down": {
@@ -96,10 +96,20 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "pulse-glow": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
+        "signal-flow": {
+          "0%": { strokeDashoffset: "20" },
+          "100%": { strokeDashoffset: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-glow": "pulse-glow 1s ease-in-out infinite",
+        "signal-flow": "signal-flow 1s linear infinite",
       },
     },
   },

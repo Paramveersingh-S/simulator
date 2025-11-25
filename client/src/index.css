@@ -171,7 +171,63 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-mono antialiased bg-slate-900 text-slate-100;
+  }
+}
+
+@layer utilities {
+  .circuit-board {
+    background-color: #1e293b;
+    background-image: 
+      linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .led-glow-on {
+    box-shadow: 
+      0 0 10px rgba(52, 211, 153, 0.6),
+      0 0 20px rgba(52, 211, 153, 0.4),
+      0 0 30px rgba(52, 211, 153, 0.2),
+      inset 0 0 10px rgba(52, 211, 153, 0.5);
+  }
+
+  .led-glow-off {
+    box-shadow: 
+      inset 0 2px 4px rgba(0, 0, 0, 0.6);
+  }
+
+  .wire-glow {
+    filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 8px currentColor);
+  }
+
+  .switch-on {
+    background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    box-shadow: 
+      0 4px 6px rgba(0, 0, 0, 0.3),
+      0 0 10px rgba(52, 211, 153, 0.5),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+      inset 0 2px 4px rgba(255, 255, 255, 0.2);
+  }
+
+  .switch-off {
+    background: linear-gradient(135deg, #475569 0%, #334155 100%);
+    box-shadow: 
+      inset 0 2px 4px rgba(0, 0, 0, 0.6),
+      0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  .ic-chip {
+    background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+    box-shadow: 
+      0 4px 6px rgba(0, 0, 0, 0.4),
+      inset 0 1px 2px rgba(255, 255, 255, 0.1),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+    border: 2px solid #475569;
+  }
+
+  .clock-pulse {
+    animation: pulse-glow 1s ease-in-out infinite;
   }
 }
 
